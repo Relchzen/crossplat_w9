@@ -5,10 +5,13 @@ import * as MediaLibrary from 'expo-media-library';
 import Geolocation from 'react-native-geolocation-service';
 import { StyleSheet, Text, View, Button, Alert, Image, Platform, PermissionsAndroid } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { collection, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
 
 const ImagePickerComponent = () => {
   const [uri, setUri] = useState("");
-  const [locationData, setLocationData] = useState([]);
+  const [locationData, setLocationData] = useState(null);
 
   const openImagePicker = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -45,36 +48,31 @@ const ImagePickerComponent = () => {
   };
 
   const handleResponse = (response) => {
+    // Log the entire response object
+    console.log('Full Response:', JSON.stringify(response, null, 2));
+  
     if (response.canceled) {
       console.log("User cancelled image picker");
+      setUri(null);
     } else if (response.assets && response.assets.length > 0) {
-      const imageUri = response.assets[0]?.uri || "";
-      setUri(imageUri);
+      const imageUri = response.assets[0].uri;
+      
+      // Additional type and content checks
       console.log("Image URI:", imageUri);
+      console.log("Image URI type:", typeof imageUri);
+      console.log("Image URI exists:", !!imageUri);
+  
+      // Validate the URI before setting
+      if (typeof imageUri === 'string' && imageUri.trim() !== '') {
+        setUri(imageUri);
+      } else {
+        console.error("Invalid image URI");
+        Alert.alert("Error", "Invalid image URI");
+      }
     } else {
       console.log("No image URI found in the response");
       Alert.alert("Error", "Failed to retrieve image URI.");
-    }
-  };
-
-  const saveToCameraRoll = async () => {
-    if (!uri) {
-      Alert.alert("No image to save", "Please capture or select an image first.");
-      return;
-    }
-
-    const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
-    if (!mediaLibraryPermission.granted) {
-      Alert.alert("Permission required", "You need to enable permission to save images to the gallery.");
-      return;
-    }
-
-    try {
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("Camera Roll", asset, false);
-      Alert.alert("Image saved!", "The image has been saved to your Camera Roll.");
-    } catch (error) {
-      Alert.alert("Save Error", "Failed to save the image.");
+      setUri(null);
     }
   };
 
@@ -88,9 +86,8 @@ const ImagePickerComponent = () => {
     Geolocation.getCurrentPosition(
       (position) => {
         const coords = position.coords;
-        setLocationData((prev) => [...prev, coords]);
+        setLocationData(coords);
         console.log("Location Data:", coords);
-        saveLocationToFile(coords);
       },
       (error) => {
         console.error(`Error ${error.code}`, error.message);
@@ -101,24 +98,6 @@ const ImagePickerComponent = () => {
         maximumAge: 10000,
       }
     );
-  };
-
-  const saveLocationToFile = async (coords) => {
-    try {
-      const fileUri = `${FileSystem.documentDirectory}Download/location_data.txt`;
-      const locationString = `Latitude: ${coords.latitude}, Longitude: ${coords.longitude}, Timestamp: ${new Date().toISOString()}\n`;
-
-      await FileSystem.writeAsStringAsync(fileUri, locationString, {
-        encoding: FileSystem.EncodingType.UTF8,
-        append: true,
-      });
-
-      Alert.alert("Location Saved", "Location data has been saved to Downloads folder.");
-      console.log("Location saved to:", fileUri);
-    } catch (error) {
-      console.error("Error saving location data:", error);
-      Alert.alert("Error", "Failed to save location data.");
-    }
   };
 
   const hasLocationPermission = async () => {
@@ -139,21 +118,59 @@ const ImagePickerComponent = () => {
     return status === PermissionsAndroid.RESULTS.GRANTED;
   };
 
+  const saveToFirebase = async () => {
+    if (!uri || !locationData) {
+      Alert.alert("Missing Data", "Make sure to select an image and fetch location first.");
+      return;
+    }
+
+    try {
+      // Upload image to Firebase Storage
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const storageRef = ref(storage, `images/${Date.now()}.jpg`);
+      const uploadResult = await uploadBytes(storageRef, blob);
+
+      // Get the download URL
+      const downloadURL = await getDownloadURL(uploadResult.ref);
+
+      // Save metadata to Firestore
+      const docRef = await addDoc(collection(db, "photos"), {
+        imageUrl: downloadURL,
+        location: {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      Alert.alert("Success", `Photo and location saved with ID: ${docRef.id}`);
+    } catch (error) {
+      console.error("Error saving to Firebase:", error);
+      Alert.alert("Error", "Failed to save photo and location.");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text>Aurelius Brandon Alexander Abuthan - 00000075101</Text>
       <Button title="OPEN CAMERA" onPress={handleCameraLaunch} color="#1E90FF" />
       <Button title="OPEN GALLERY" onPress={openImagePicker} color="#1E90FF" />
-      {uri ? (
-          <>
-            <Image source={{ uri }} style={styles.image} />
-            <Button title="GET GEO LOCATION" onPress={getLocation} color="#1E90FF" />
-r            <Button title="CREATE FILE" onPress={saveToCameraRoll} color="#1E90FF" />
-          </>
-        ) : (
-          <Text>No image selected</Text>
-        )}      
-        <StatusBar style="auto" />
+      {uri && typeof uri === 'string' ? (
+      <Image 
+        source={{ uri: uri }} 
+        style={styles.image} 
+        resizeMode="cover"
+        onError={(e) => {
+          console.error('Image load error:', JSON.stringify(e.nativeEvent));
+          Alert.alert('Image Error', 'Could not load the image');
+          setUri(null);
+        }}
+      />
+    ) : (
+      <Text>No image selected</Text>
+    )}
+      <StatusBar style="auto" />
     </View>
   );
 };
@@ -175,3 +192,4 @@ const styles = StyleSheet.create({
 });
 
 export default ImagePickerComponent;
+
