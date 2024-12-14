@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
+import * as Notifications from 'expo-notifications';
 
 const ImagePickerComponent = () => {
   const [uri, setUri] = useState("");
@@ -118,6 +119,16 @@ const ImagePickerComponent = () => {
     return status === PermissionsAndroid.RESULTS.GRANTED;
   };
 
+  const showNotification = async (title, body) => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+      },
+      trigger: null,
+    });
+  };
+
   const saveToFirebase = async () => {
     if (!uri || !locationData) {
       Alert.alert("Missing Data", "Make sure to select an image and fetch location first.");
@@ -145,9 +156,17 @@ const ImagePickerComponent = () => {
       });
 
       Alert.alert("Success", `Photo and location saved with ID: ${docRef.id}`);
+      await showNotification(
+        "Data Saved Successfully",
+        `Image and location saved: Lat ${locationData.latitude}, Lon ${locationData.longitude}`
+      );
     } catch (error) {
       console.error("Error saving to Firebase:", error);
       Alert.alert("Error", "Failed to save photo and location.");
+      await showNotification(
+        "Data Save Failed",
+        `Failed to save data: Lat ${locationData?.latitude || "N/A"}, Lon ${locationData?.longitude || "N/A"}`
+      );
     }
   };
 
@@ -170,6 +189,8 @@ const ImagePickerComponent = () => {
     ) : (
       <Text>No image selected</Text>
     )}
+      <Button title="GET GEO LOCATION" onPress={getLocation} color="#1E90FF" />
+      <Button title="SAVE TO FIREBASE" onPress={saveToFirebase} color="#1E90FF" />
       <StatusBar style="auto" />
     </View>
   );
@@ -192,4 +213,3 @@ const styles = StyleSheet.create({
 });
 
 export default ImagePickerComponent;
-

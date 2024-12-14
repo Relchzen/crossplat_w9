@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "726388990740",
+    "project_id": "if670-crossplatform",
+    "storage_bucket": "if670-crossplatform.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726388990740:android:5a53b70668250c42b7d801",
+        "android_client_info": {
+          "package_name": "com.anonymous.Week09"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDh7A2vu8GwFgD8RZn52kiR3x6v8nW9ccM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
