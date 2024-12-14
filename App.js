@@ -48,9 +48,11 @@ const ImagePickerComponent = () => {
     if (response.canceled) {
       console.log("User cancelled image picker");
     } else if (response.assets && response.assets.length > 0) {
-      const imageUri = response.assets[0].uri;
+      const imageUri = response.assets[0]?.uri || "";
       setUri(imageUri);
+      console.log("Image URI:", imageUri);
     } else {
+      console.log("No image URI found in the response");
       Alert.alert("Error", "Failed to retrieve image URI.");
     }
   };
@@ -142,9 +144,16 @@ const ImagePickerComponent = () => {
       <Text>Aurelius Brandon Alexander Abuthan - 00000075101</Text>
       <Button title="OPEN CAMERA" onPress={handleCameraLaunch} color="#1E90FF" />
       <Button title="OPEN GALLERY" onPress={openImagePicker} color="#1E90FF" />
-      <Button title="GET GEO LOCATION" onPress={getLocation} color="#1E90FF" />
-      {uri ? <Image source={{ uri }} style={styles.image} /> : <Text>No image selected</Text>}
-      <StatusBar style="auto" />
+      {uri ? (
+          <>
+            <Image source={{ uri }} style={styles.image} />
+            <Button title="GET GEO LOCATION" onPress={getLocation} color="#1E90FF" />
+r            <Button title="CREATE FILE" onPress={saveToCameraRoll} color="#1E90FF" />
+          </>
+        ) : (
+          <Text>No image selected</Text>
+        )}      
+        <StatusBar style="auto" />
     </View>
   );
 };
